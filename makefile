@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -std=c++11
 INCLUDES = -Iincludes
-LIBS = -lportaudio -lsndfile
+LIBS = -lportaudio -lsndfile -lfftw3
 TARGET = audio_visualizer
 SRCS = $(wildcard src/*.cpp) $(wildcard src/*.hpp)
 OBJS = $(SRCS:.cpp=.o)
