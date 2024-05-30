@@ -3,13 +3,13 @@
 #include <sndfile.h>
 #include <vector>
 
-#define SAMPLE_RATE 44100
 #define FRAMES_PER_BUFFER 256
 
 struct AudioData {
-    std::vector<float> buffer;
-    size_t position;
-    unsigned long sampleRate; 
+  std::vector<float> buffer;
+  size_t position;
+  unsigned long sampleRate;
+  int channels;
 };
 
 static int audioCallback(const void *inputBuffer, void *outputBuffer,
@@ -19,18 +19,19 @@ static int audioCallback(const void *inputBuffer, void *outputBuffer,
   AudioData *audioData = (AudioData *)userData;
   float *out = (float *)outputBuffer;
   unsigned long remaining = audioData->buffer.size() - audioData->position;
+  unsigned long samplesToCopy = framesPerBuffer * audioData->channels;
 
-  if (remaining < framesPerBuffer) {
-    std::fill(out, out + framesPerBuffer, 0.0f);    // if not enough data remains in this shit, fill with silence
-    std::copy(audioData->buffer.begin() + audioData->position,    // copy remaining data to output
+  if (remaining < samplesToCopy) {
+    std::fill(out, out + samplesToCopy, 0.0f);
+    std::copy(audioData->buffer.begin() + audioData->position,
               audioData->buffer.end(), out);
     audioData->position = audioData->buffer.size();
     return paComplete;
   } else {
-    std::copy(audioData->buffer.begin() + audioData->position,     // Copy audio data to output
-              audioData->buffer.begin() + audioData->position + framesPerBuffer,
+    std::copy(audioData->buffer.begin() + audioData->position,
+              audioData->buffer.begin() + audioData->position + samplesToCopy,
               out);
-    audioData->position += framesPerBuffer;
+    audioData->position += samplesToCopy;
   }
   return paContinue;
 }
@@ -48,7 +49,7 @@ AudioData loadAudioFile(const char *filePath) {
   sf_readf_float(file, buffer.data(), sfInfo.frames);
   sf_close(file);
 
-  return {buffer, 0};
+  return {buffer, 0, (unsigned long)sfInfo.samplerate, sfInfo.channels};
 }
 
 int main() {
@@ -67,23 +68,23 @@ int main() {
   // Open audio stream
   PaStream *stream;
   err = Pa_OpenDefaultStream(&stream,
-                             0,             // No input channels
-                             1,             // Number of output channels
-                             paFloat32,     // Sample format
-                             SAMPLE_RATE,         // Sample rate
-                             FRAMES_PER_BUFFER,           // Frames per buffer
-                             audioCallback, // Callback function
-                             &audioData);   // User data
+                             0,                    // No input channels
+                             audioData.channels,   // Number of output channels
+                             paFloat32,            // Sample format
+                             audioData.sampleRate, // Sample rate from file
+                             FRAMES_PER_BUFFER,    // Frames per buffer
+                             audioCallback,        // Callback function
+                             &audioData);          // User data
   if (err != paNoError) {
-    std::cerr << "portAudio error: " << Pa_GetErrorText(err) << std::endl;
+    std::cerr << "PortAudio error: " << Pa_GetErrorText(err) << std::endl;
     Pa_Terminate();
     return 1;
   }
 
-  // start audio stream
+  // Start audio stream
   err = Pa_StartStream(stream);
   if (err != paNoError) {
-    std::cerr << "portAudio error: " << Pa_GetErrorText(err) << std::endl;
+    std::cerr << "PortAudio error: " << Pa_GetErrorText(err) << std::endl;
     Pa_CloseStream(stream);
     Pa_Terminate();
     return 1;
@@ -93,12 +94,15 @@ int main() {
   while (Pa_IsStreamActive(stream) == 1) {
     Pa_Sleep(100);
   }
+
+  // stop and close the stream
   err = Pa_StopStream(stream);
   if (err != paNoError) {
-    std::cerr << "portAudio error: " << Pa_GetErrorText(err) << std::endl;
+    std::cerr << "PortAudio error: " << Pa_GetErrorText(err) << std::endl;
   }
   Pa_CloseStream(stream);
-  std::cout << "audio playback finished" << std::endl;
+  std::cout << "stream closed" << std::endl;
+  // Terminate PortAudio
   Pa_Terminate();
 
   return 0;
