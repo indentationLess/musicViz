@@ -1,2 +1,4 @@
 src/audioCapture.o
 audio_visualizer
+obj/audioCapture.o
+audioCapture
