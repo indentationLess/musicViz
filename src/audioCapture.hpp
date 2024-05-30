@@ -14,7 +14,7 @@ private:
     unsigned long sampleRate;
     int channels;
     fftw_complex *fftw_output;
-    fftw_plan fftw_plan_; // Renamed to avoid conflict
+    fftw_plan fftw_plan_;
   };
   AudioData audioData;
   PaStream *stream;
